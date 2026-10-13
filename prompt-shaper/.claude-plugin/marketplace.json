@@ -1,0 +1,5 @@
+{
+  "name": "prompt-shaper-local",
+  "owner": { "name": "tuan.mai" },
+  "plugins": [{ "name": "prompt-shaper", "source": "./" }]
+}

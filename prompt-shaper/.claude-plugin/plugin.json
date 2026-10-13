@@ -1,0 +1,26 @@
+{
+  "name": "prompt-shaper",
+  "version": "0.1.0",
+  "description": "Rewrites short, casual prompts with a fast model into Context / Objective / Steps / Output / Constraints, then lets you send the shaped or the original version",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Shape short prompts",
+      "description": "Intercept short prompts and offer a structured rewrite",
+      "default": true
+    },
+    "maxWords": {
+      "type": "number",
+      "title": "Max words to shape",
+      "description": "Prompts with more words than this are sent unchanged",
+      "default": 30
+    },
+    "model": {
+      "type": "string",
+      "title": "Rewrite model",
+      "description": "Model alias or id used for the rewrite",
+      "default": "haiku"
+    }
+  }
+}
