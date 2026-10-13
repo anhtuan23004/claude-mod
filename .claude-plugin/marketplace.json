@@ -1,0 +1,12 @@
+{
+  "name": "claude-mod",
+  "owner": { "name": "anhtuan23004" },
+  "description": "Community mods for Claude Code",
+  "plugins": [
+    {
+      "name": "prompt-shaper",
+      "source": "./prompt-shaper",
+      "description": "Rewrites short, casual prompts into Context / Objective / Steps / Output / Constraints before they are sent"
+    }
+  ]
+}

@@ -15,7 +15,7 @@ You review the rewrite before anything is sent, and you can always fall back to 
 In a Claude Code terminal session, type:
 
 ```
-/plugin install prompt-shaper --marketplace <owner>/<repo>
+/plugin install prompt-shaper --marketplace anhtuan23004/claude-mod
 ```
 
 Answer `y` to add the marketplace, then choose a scope with Enter (**user** is listed first and applies to every session). The mod starts working in that session right away, with no restart.
@@ -46,7 +46,7 @@ The rewrite uses the language of your prompt for its content and keeps the secti
 
 ## Settings
 
-Open `/config`, or run `/plugin configure prompt-shaper@<marketplace>`:
+Open `/config`, or run `/plugin configure prompt-shaper@claude-mod`:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
