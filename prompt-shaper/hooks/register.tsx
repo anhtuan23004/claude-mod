@@ -5,6 +5,8 @@ import type { Shaping } from '../types'
 
 const PANE = 'prompt-shaper'
 const SECTIONS = ['Context', 'Objective', 'Steps', 'Output', 'Constraints']
+// Prompts a person typed: the terminal, Remote Control, and the SDK hosts (VS Code, the desktop app).
+const PERSON = new Set(['composer', 'bridge', 'sdk'])
 
 const pending = atom({ plugin: 'prompt-shaper', key: 'pending' } as const, null)
 const skipNext = atom({ plugin: 'prompt-shaper', key: 'skipNext' } as const, false)
@@ -55,9 +57,12 @@ export const register: Register = (on, options) => {
 
   on('prompt.submit', async ($, e, next) => {
     if (!isEnabled || (await read($, isOff))) return next(e)
-    if (e.origin.kind !== 'composer' || e.turnId !== undefined || e.attachments?.length) {
+    if (!PERSON.has(e.origin.kind) || e.turnId !== undefined || e.attachments?.length) {
       return next(e)
     }
+    // The terminal types as `composer`; VS Code and the desktop app run under an SDK host and
+    // type as `sdk`, as a plain `claude -p` does. Only shape where a surface can draw the dialog.
+    if ((await $.session.surfaces()).length === 0) return next(e)
 
     if (await read($, skipNext)) {
       await update($, skipNext, () => false)
@@ -118,9 +123,15 @@ export const register: Register = (on, options) => {
           rows: Math.min(30, shaped.split('\n').length + 4),
         })
         if (!opened.isPlaced) {
-          // No room for the dialog: hand the shaped text to the composer instead.
-          await edit($, shaped)
-          $.ui.toast('prompt-shaper: shaped prompt placed in the input; Enter sends it')
+          // No room for the dialog: hand the shaped text to the input box, else send as typed.
+          await update($, pending, () => null)
+          const filled = await $.prompt.fill({ text: shaped })
+          if (filled.isFilled) {
+            await update($, skipNext, () => true)
+            $.ui.toast('prompt-shaper: shaped prompt placed in the input; Enter sends it')
+          } else {
+            await $.prompt.submit({ text, asUser: true })
+          }
         }
       })()
     })
@@ -128,14 +139,13 @@ export const register: Register = (on, options) => {
     return { drop: 'prompt-shaper: review the shaped prompt (Esc puts yours back)' }
   }).catch(($, e, next) => next(e))
 
-  // Esc or the close mark: nothing is lost, the original goes back into the composer.
+  // Esc or the close mark: nothing is lost, the original goes back into the input box.
   on('ui.close', async ($, e, next) => {
     if (e.id !== PANE || e.origin.kind !== 'person') return next(e)
     const shaping = await read($, pending)
     if (shaping) {
       await update($, pending, () => null)
-      await update($, skipNext, () => true)
-      await $.prompt.fill({ text: shaping.original })
+      await putBack($, shaping.original)
     }
 
     return next(e)
@@ -196,9 +206,19 @@ async function send($: EngineInterface, text: string) {
 }
 
 async function edit($: EngineInterface, text: string) {
-  await update($, skipNext, () => true)
   await finish($)
-  await $.prompt.fill({ text })
+  await putBack($, text)
+}
+
+// Where the surface has no input box to fill, the text goes to the clipboard instead.
+async function putBack($: EngineInterface, text: string) {
+  const filled = await $.prompt.fill({ text })
+  if (filled.isFilled) {
+    await update($, skipNext, () => true)
+    return
+  }
+  await $.ui.copy({ text })
+  $.ui.toast('prompt-shaper: no input box to fill here, so the text was copied to the clipboard')
 }
 
 async function recentConversation($: EngineInterface): Promise<string> {

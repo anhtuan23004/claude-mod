@@ -1,6 +1,6 @@
 {
   "name": "prompt-shaper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Rewrites short, casual prompts with a fast model into Context / Objective / Steps / Output / Constraints, then lets you send the shaped or the original version",
   "types": "./types/index.d.ts",
   "userConfig": {

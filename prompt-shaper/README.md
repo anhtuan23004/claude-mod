@@ -8,7 +8,7 @@ A Claude Code mod that catches short, casual prompts and asks a fast model (Clau
 - **Output**
 - **Constraints**
 
-You review the rewrite before anything is sent, and you can always fall back to what you typed.
+You review the rewrite before anything is sent, and you can always fall back to what you typed. It works in the terminal, in the VS Code extension and in the Claude desktop app.
 
 ## Install
 
@@ -40,6 +40,7 @@ The rewrite uses the language of your prompt for its content and keeps the secti
 
 - The prompt is longer than the word limit, spans several lines, or has images attached.
 - The prompt is typed while Claude is still working.
+- Nothing can show the dialog, as in a plain `claude -p` run.
 - The prompt starts with `/`, `!` or `#`, or contains an `@file` mention.
 - The prompt starts with `\`: it is sent as typed, without the backslash.
 - The rewrite fails, or comes back without all five sections. A toast explains what happened, and your prompt is sent as typed.
@@ -59,6 +60,7 @@ In a session, `/prompt-shaper off` or `/prompt-shaper on` toggles shaping for th
 ## Notes
 
 - Each shaped prompt waits for one extra model call, usually 1–3 seconds.
+- Where there is no input box to put text back into, Edit, Revert and `Esc` copy the text to the clipboard instead, and a toast says so.
 - A prompt sent from the dialog is recorded in the transcript as sent by the plugin. The model reads it as your own words.
 - The rewrite call uses your Claude Code session's own model access, so it costs tokens on the same account.
 

@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
-import type { On } from 'claude-code'
+import type { On, RenderSurface } from 'claude-code'
 
 const SHAPED = `## Context
 Đang làm service document-intelligence.
@@ -33,12 +33,21 @@ const PANE_PROPS = {
 type World = {
   submitted: { text: string; origin: string }[]
   filled: string[]
+  copied: string[]
   opened: string[]
   models: string[]
 }
 
-function world(on: On, reply: string | null): World {
-  const w: World = { submitted: [], filled: [], opened: [], models: [] }
+type Where = { surfaces?: readonly RenderSurface[]; canFill?: boolean }
+
+function world(on: On, reply: string | null, where: Where = {}): World {
+  const { surfaces = ['terminal'], canFill = true } = where
+  const w: World = { submitted: [], filled: [], copied: [], opened: [], models: [] }
+  on('session.surfaces', () => ({ value: surfaces }))
+  on('ui.copy', (_$, e) => {
+    w.copied.push(e.text)
+    return { value: { isCopied: true } as const }
+  })
   on('model.complete', (_$, e) => {
     w.models.push(e.model)
     return {
@@ -54,6 +63,7 @@ function world(on: On, reply: string | null): World {
     return { text: e.text }
   })
   on('prompt.fill', (_$, e) => {
+    if (!canFill) return { isFilled: false }
     w.filled.push(e.text)
     return { isFilled: true }
   })
@@ -67,8 +77,17 @@ function world(on: On, reply: string | null): World {
   return w
 }
 
-const typed = ($: Engine, text: string) =>
-  $.prompt.submit({ text, wait: false, origin: { kind: 'composer' } })
+const typed = ($: Engine, text: string, kind: 'composer' | 'sdk' | 'bridge' = 'composer') =>
+  $.prompt.submit({ text, wait: false, origin: { kind } })
+
+const mountPane = ($: Engine, surface: RenderSurface) =>
+  $.ui.mount({
+    plugin: 'prompt-shaper',
+    surface,
+    component: 'Pane',
+    requestId: 'prompt-shaper',
+    props: PANE_PROPS,
+  })
 
 test('a short prompt is held and shaped by haiku', async ($, on) => {
   const clock = mock.clock(on)
@@ -166,4 +185,56 @@ test('maxWords from settings is honoured', { options: { maxWords: 2 } }, async (
   await typed($, 'please fix the failing test')
   expect(w.models).toEqual([])
   expect(w.submitted).toHaveLength(1)
+})
+
+for (const surface of ['vscode', 'desktop'] as const) {
+  test(`a prompt typed in ${surface} (sdk origin) is shaped`, async ($, on) => {
+    const clock = mock.clock(on)
+    const w = world(on, SHAPED, { surfaces: [surface] })
+
+    const result = await typed($, 'fix cái test fail', 'sdk')
+    expect(result.drop).toBeDefined()
+    await clock.advance(100)
+    expect(w.opened).toEqual(['prompt-shaper'])
+
+    const ui = await mountPane($, surface)
+    expect(await ui.find({ type: 'Markdown', text: /## Objective/ })).toBeDefined()
+    await ui.press({ key: 'send-shaped' })
+    expect(w.submitted).toEqual([{ text: SHAPED, origin: 'plugin' }])
+    await ui.unmount()
+  })
+}
+
+test('the dialog draws on every surface', async ($, on) => {
+  const clock = mock.clock(on)
+  world(on, SHAPED, { surfaces: ['mobile'] })
+
+  await typed($, 'fix cái test fail', 'bridge')
+  await clock.advance(100)
+  for (const surface of ['terminal', 'desktop', 'vscode', 'mobile'] as const) {
+    const ui = await mountPane($, surface)
+    expect(await ui.find({ key: 'send-original' })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
+test('a claude -p run (no surface) sends the prompt as typed', async ($, on) => {
+  const w = world(on, SHAPED, { surfaces: [] })
+
+  await typed($, 'fix it', 'sdk')
+  expect(w.submitted).toEqual([{ text: 'fix it', origin: 'sdk' }])
+  expect(w.models).toEqual([])
+})
+
+test('revert with no input box copies the original instead of losing it', async ($, on) => {
+  const clock = mock.clock(on)
+  const w = world(on, SHAPED, { surfaces: ['vscode'], canFill: false })
+
+  await typed($, 'refactor this', 'sdk')
+  await clock.advance(100)
+  const ui = await mountPane($, 'vscode')
+  await ui.press({ key: 'edit-original' })
+  await ui.unmount()
+  expect(w.filled).toEqual([])
+  expect(w.copied).toEqual(['refactor this'])
 })
